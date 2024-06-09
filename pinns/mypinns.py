@@ -48,6 +48,10 @@ def function(self, t, x, y):
     u = torch.autograd.grad(psi, y, grad_outputs=torch.ones_like(psi), create_graph=True)[0].to(device)
     v = -1.*torch.autograd.grad(psi, x, grad_outputs=torch.ones_like(psi), create_graph=True)[0].to(device)
 
+    u_t = torch.autograd.grad(u, t, grad_outputs=torch.ones_like(u), create_graph=True)[0].to(device)
+    v_t = torch.autograd.grad(u, t, grad_outputs=torch.ones_like(u), create_graph=True)[0].to(device)
+
+
     u_x = torch.autograd.grad(u, x, grad_outputs=torch.ones_like(u), create_graph=True)[0].to(device)
     u_xx = torch.autograd.grad(u_x, x, grad_outputs=torch.ones_like(u_x), create_graph=True)[0].to(device)
     u_y = torch.autograd.grad(u, y, grad_outputs=torch.ones_like(u), create_graph=True)[0].to(device)
@@ -61,8 +65,8 @@ def function(self, t, x, y):
     p_x = torch.autograd.grad(p, x, grad_outputs=torch.ones_like(p), create_graph=True)[0].to(device)
     p_y = torch.autograd.grad(p, y, grad_outputs=torch.ones_like(p), create_graph=True)[0].to(device)
 
-    f = u * u_x + v * u_y + p_x - nu * (u_xx + u_yy)
-    g = u * v_x + v * v_y + p_y - nu * (v_xx + v_yy)
+    f = u_t + u * u_x + v * u_y + p_x - nu * (u_xx + u_yy)
+    g = v_t + u * v_x + v * v_y + p_y - nu * (v_xx + v_yy)
 
     grad = torch.hstack((u_x, u_y, v_x, v_y))
     return u, v, p, f, g, grad

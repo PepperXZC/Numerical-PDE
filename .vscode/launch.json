@@ -10,7 +10,9 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "justMyCode": false
+            "justMyCode": false,
+            "cwd": "${fileDirname}",
+            "python.pythonPath": "/home/xzc/miniconda3/envs/xcode/bin/python",
         }
     ]
 }
