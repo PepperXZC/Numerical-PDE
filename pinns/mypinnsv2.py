@@ -145,7 +145,7 @@ def find_uvp(t, X, Y, N_plt):
     p = pp.cpu().detach().numpy().reshape(-N_plt,N_plt)
     return u, v, p
 
-def mask(weight, c=0.5, k=1.5):
+def mask(weight, c=1, k=1.5):
     return c * weight ** k
 
 class MyOptimizer(torch.optim.Optimizer):
@@ -328,16 +328,21 @@ if __name__ == '__main__':
     x_rightt_in = Variable(torch.from_numpy(np.reshape(x_right_t, (-1, 1))).float(), requires_grad = True).to(device)
     y_rightt_in = Variable(torch.from_numpy(np.reshape(y_right_t, (-1, 1))).float(), requires_grad = True).to(device)
 
-    weight_upt = Variable(torch.ones_like(x_upt_in) * 10, requires_grad = True).to(device)
+    
+    weight_upt = Variable(torch.ones_like(x_upt_in) * 3, requires_grad = True).to(device)
     weight_lowt = Variable(torch.ones_like(x_lowt_in), requires_grad = True).to(device)
     weight_leftt = Variable(torch.ones_like(x_leftt_in), requires_grad = True).to(device)
     weight_rightt = Variable(torch.ones_like(x_rightt_in), requires_grad = True).to(device)
-    weight_rest = Variable(torch.ones_like(x_rest_in), requires_grad = True).to(device)
-    
-    torch.nn.init.uniform_(weight_rest)
-    torch.nn.init.uniform_(weight_rightt)
-    torch.nn.init.uniform_(weight_leftt)
-    torch.nn.init.uniform_(weight_lowt)
+    # weight_rest = Variable(torch.ones_like(x_rest_in), requires_grad = True).to(device)
+    # weight_lowt = torch.ones_like(x_lowt_in).to(device)
+    # weight_leftt = torch.ones_like(x_leftt_in).to(device)
+    # weight_rightt = torch.ones_like(x_rightt_in).to(device)
+    weight_rest = torch.ones_like(x_rest_in).to(device)
+
+    # torch.nn.init.uniform_(weight_rest)
+    # torch.nn.init.uniform_(weight_rightt)
+    # torch.nn.init.uniform_(weight_leftt)
+    # torch.nn.init.uniform_(weight_lowt)
     # torch.nn.init.uniform_(weight_upt)
 
     t0data = torch.zeros(2, res_num*nt).to(device)
@@ -364,7 +369,8 @@ if __name__ == '__main__':
         optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
         optimizer_lamda = torch.optim.Adam([
         # optimizer_lamda = MyAdam([
-            weight_upt, weight_lowt, weight_leftt, weight_rightt, weight_rest], lr=0.001)
+            # weight_upt], lr=5e-2)
+            weight_upt, weight_lowt, weight_leftt, weight_rightt], lr=5e-3)
         for n in range(N_iter_Adam):
             optimizer_lamda.zero_grad()
             loss2 = torch.mul(closure(t0data), -1).to(device)
@@ -445,15 +451,15 @@ if __name__ == '__main__':
 
         #### LBFGS ####
         print("------ IN LBFGS ------")
-        N_iter_LBFGS = 20
+        N_iter_LBFGS = 200
         optimizer = torch.optim.LBFGS(net.parameters(), history_size=8, max_iter=500000)
         # optimizer_lamda = torch.optim.LBFGS([
-        optimizer_lamda = MyAdam([
-            weight_upt, weight_lowt, weight_leftt, weight_rightt, weight_rest], history_size=8, max_iter=500000)
+        # optimizer_lamda = MyAdam([
+            # weight_upt, weight_lowt, weight_leftt, weight_rightt, weight_rest], history_size=8, max_iter=500000)
         for n in range(N_iter_LBFGS):
             loss = closure(t0data) 
             optimizer.step()
-            optimizer_lamda.step()
+            # optimizer_lamda.step()
             loss_LBFGS.append(loss.cpu().detach().numpy())
             
             print("LBFGS - Epoch: ", n, "Training Loss: ", loss.item())
