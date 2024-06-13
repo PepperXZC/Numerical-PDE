@@ -182,12 +182,12 @@ if __name__ == '__main__':
 
             u_res, v_res, p_res, f_res, g_res = function(net, x_res_in, y_res_in)
 
-            grad_u_x, grad_u_y, grad_v_x, grad_v_y = grad(u_res, v_res, x_res_in, y_res_in)
-            grad_loss_res = mse_loss_func(grad_u_x, zeros1) + mse_loss_func(grad_u_y, zeros1) + mse_loss_func(grad_v_x, zeros1) + mse_loss_func(grad_v_y, zeros1)
+            # grad_u_x, grad_u_y, grad_v_x, grad_v_y = grad(u_res, v_res, x_res_in, y_res_in)
+            #  grad_loss_res = mse_loss_func(grad_u_x, zeros1) + mse_loss_func(grad_u_y, zeros1) + mse_loss_func(grad_v_x, zeros1) + mse_loss_func(grad_v_y, zeros1)
     
             f_loss_res = mse_loss_func(f_res, zeros1)       # to satisfy the PDE
             g_loss_res = mse_loss_func(g_res, zeros1)       # to satisfy the PDE
-            loss_res = f_loss_res + g_loss_res + grad_loss_res
+            loss_res = f_loss_res + g_loss_res 
 
             # LOSS FUNCTION:
             loss =  loss_up + loss_low + loss_left + loss_right + loss_res 
@@ -245,10 +245,10 @@ if __name__ == '__main__':
             u_res, v_res, p_res, f_res, g_res = function(net, x_res_in, y_res_in)
             f_loss_res = mse_loss_func(f_res, zeros1)       # to satisfy the PDE
             g_loss_res = mse_loss_func(g_res, zeros1)       # to satisfy the PDE
-            grad_u_x, grad_u_y, grad_v_x, grad_v_y = grad(u_res, v_res, x_res_in, y_res_in)
-            grad_loss_res = mse_loss_func(grad_u_x, zeros1) + mse_loss_func(grad_u_y, zeros1) + mse_loss_func(grad_v_x, zeros1) + mse_loss_func(grad_v_y, zeros1)
+            # grad_u_x, grad_u_y, grad_v_x, grad_v_y = grad(u_res, v_res, x_res_in, y_res_in)
+            # grad_loss_res = mse_loss_func(grad_u_x, zeros1) + mse_loss_func(grad_u_y, zeros1) + mse_loss_func(grad_v_x, zeros1) + mse_loss_func(grad_v_y, zeros1)
     
-            loss_res = f_loss_res + g_loss_res + grad_loss_res
+            loss_res = f_loss_res + g_loss_res # + grad_loss_res
 
             # LOSS FUNCTION:
             loss =  loss_up + loss_low + loss_left + loss_right + loss_res 

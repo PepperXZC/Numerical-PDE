@@ -106,21 +106,24 @@ def closure(t0data=0):
 
     u_res, v_res, p_res, f_res, g_res = function(net, tbrest_in, x_rest_in, y_rest_in)
     zeros1 = t0data
-    
+    # xtest = x_rest_in.reshape(nt, res_num)
     ut_res = u_res.reshape(nt, res_num)
     vt_res = v_res.reshape(nt, res_num)
+    pt_res = p_res.reshape(nt, res_num)
     ft_res = f_res.reshape(nt, res_num)
     gt_res = g_res.reshape(nt, res_num)
     # for i in range(nt):
     #     A = torch.from_numpy(amat[i].repeat(repeats=res_num)).to(device)
     uci = ut_res + dt * A @ ft_res
     vci = vt_res + dt * A @ gt_res
+    pci = pt_res + dt * A @ pt_res
     
     u_loss_res = mask(weight_rest) * mse_loss_func(uci.reshape(-1, 1), zeros1[0].reshape(-1,1)) 
     v_loss_res = mask(weight_rest) * mse_loss_func(vci.reshape(-1, 1), zeros1[1].reshape(-1,1))
-    loss_res = u_loss_res.mean() + v_loss_res.mean()
+    p_loss_res = mask(weight_rest) * mse_loss_func(pci.reshape(-1, 1), zeros1[2].reshape(-1,1))
+    loss_res = u_loss_res.mean() + v_loss_res.mean() + p_loss_res.mean()
 
-
+    # TODO: 应该有f, g的loss，而不只是u，v
     # f_loss_res = mse_loss_func(f_res, zeros1)       # to satisfy the PDE
     # g_loss_res = mse_loss_func(g_res, zeros1)       # to satisfy the PDE
     # loss_up_val = loss_up.item()
@@ -145,8 +148,8 @@ def find_uvp(t, X, Y, N_plt):
     p = pp.cpu().detach().numpy().reshape(-N_plt,N_plt)
     return u, v, p
 
-def mask(weight, c=1, k=1.5):
-    return c * weight ** k
+def mask(weight, k=1.5):
+    return 1 / (1 + torch.exp(-k * weight).to(device))
 
 class MyOptimizer(torch.optim.Optimizer):
     def __init__(self, params, lr):
@@ -160,44 +163,6 @@ class MyOptimizer(torch.optim.Optimizer):
                     continue
                 d_p = p.grad.data
                 p.data.add_(group['lr'], d_p)  # change here
-
-class MyAdam(torch.optim.Adam):
-    def step(self, closure=None):
-        for group in self.param_groups:
-            for p in group['params']:
-                if p.grad is None:
-                    continue
-                grad = p.grad.data
-                if grad.is_sparse:
-                    raise RuntimeError('Adam does not support sparse gradients, please consider SparseAdam instead')
-
-                state = self.state[p]
-
-                # State initialization
-                if len(state) == 0:
-                    state['step'] = 0
-                    # Exponential moving average of gradient values
-                    state['exp_avg'] = torch.zeros_like(p.data, memory_format=torch.preserve_format)
-                    # Exponential moving average of squared gradient values
-                    state['exp_avg_sq'] = torch.zeros_like(p.data, memory_format=torch.preserve_format)
-
-                exp_avg, exp_avg_sq = state['exp_avg'], state['exp_avg_sq']
-                beta1, beta2 = group['betas']
-
-                state['step'] += 1
-
-                # Decay the first and second moment running average coefficient
-                exp_avg.mul_(beta1).add_(1 - beta1, grad)
-                exp_avg_sq.mul_(beta2).addcmul_(1 - beta2, grad, grad)
-
-                denom = exp_avg_sq.sqrt().add_(group['eps'])
-
-                bias_correction1 = 1 - beta1 ** state['step']
-                bias_correction2 = 1 - beta2 ** state['step']
-                # step_size = group['lr'] * (bias_correction2.sqrt() / bias_correction1)
-                step_size = torch.div(torch.mul(group['lr'], math.sqrt(bias_correction2)), bias_correction1)
-
-                p.data.add_(step_size, exp_avg.div(denom))  # change here
 
 if __name__ == '__main__':
     np.random.seed(1234)
@@ -220,7 +185,9 @@ if __name__ == '__main__':
     else:
         device = torch.device("cpu")
     
-    
+    dt = 0.1
+    Tmax = 50
+    q = 10
     ## logger 
     logger = logging.getLogger('my_logger')
     logger.setLevel(logging.DEBUG)
@@ -270,10 +237,7 @@ if __name__ == '__main__':
     y_res_in = Variable(torch.from_numpy(np.reshape(y_res, (-1, 1))).float(), requires_grad = True).to(device)
     
     ### time
-    dt = 0.1
-    Tmax = 50
     
-    q = 5
     tmp = np.float32(np.loadtxt('Utilities/IRK_weights/Butcher_IRK%d.txt' % (q), ndmin = 2))
     IRK_weights = np.reshape(tmp[0:q**2+q], (q+1,q))
     amat = IRK_weights[0:-1]
@@ -329,23 +293,23 @@ if __name__ == '__main__':
     y_rightt_in = Variable(torch.from_numpy(np.reshape(y_right_t, (-1, 1))).float(), requires_grad = True).to(device)
 
     
-    weight_upt = Variable(torch.ones_like(x_upt_in) * 3, requires_grad = True).to(device)
+    weight_upt = Variable(torch.ones_like(x_upt_in), requires_grad = True).to(device)
     weight_lowt = Variable(torch.ones_like(x_lowt_in), requires_grad = True).to(device)
     weight_leftt = Variable(torch.ones_like(x_leftt_in), requires_grad = True).to(device)
     weight_rightt = Variable(torch.ones_like(x_rightt_in), requires_grad = True).to(device)
-    # weight_rest = Variable(torch.ones_like(x_rest_in), requires_grad = True).to(device)
+    weight_rest = Variable(torch.ones_like(x_rest_in), requires_grad = True).to(device)
     # weight_lowt = torch.ones_like(x_lowt_in).to(device)
     # weight_leftt = torch.ones_like(x_leftt_in).to(device)
     # weight_rightt = torch.ones_like(x_rightt_in).to(device)
-    weight_rest = torch.ones_like(x_rest_in).to(device)
+    # weight_rest = torch.ones_like(x_rest_in).to(device)
 
-    # torch.nn.init.uniform_(weight_rest)
-    # torch.nn.init.uniform_(weight_rightt)
-    # torch.nn.init.uniform_(weight_leftt)
-    # torch.nn.init.uniform_(weight_lowt)
-    # torch.nn.init.uniform_(weight_upt)
+    torch.nn.init.uniform_(weight_rest)
+    torch.nn.init.uniform_(weight_rightt)
+    torch.nn.init.uniform_(weight_leftt)
+    torch.nn.init.uniform_(weight_lowt)
+    torch.nn.init.uniform_(weight_upt)
 
-    t0data = torch.zeros(2, res_num*nt).to(device)
+    t0data = torch.zeros(3, res_num*nt).to(device)
 
     ######### Training ########
     
@@ -357,8 +321,6 @@ if __name__ == '__main__':
         
         stli = np.array([start_t] * res_num)
         t0 = Variable(torch.from_numpy(stli.reshape(-1, 1)).float(), requires_grad = True).to(device)
-        xres0 = Variable(torch.from_numpy(np.reshape(res_pts[:, 0], (-1, 1))).float(), requires_grad = True).to(device)
-        yres0 = Variable(torch.from_numpy(np.reshape(res_pts[:, 1], (-1, 1))).float(), requires_grad = True).to(device)
 
         # tbres_in = tli.repeat(res_num)
         # tbrest_in = Variable(torch.from_numpy(np.reshape(tbres_in, (-1, 1))).float(), requires_grad = True).to(device)
@@ -370,7 +332,7 @@ if __name__ == '__main__':
         optimizer_lamda = torch.optim.Adam([
         # optimizer_lamda = MyAdam([
             # weight_upt], lr=5e-2)
-            weight_upt, weight_lowt, weight_leftt, weight_rightt], lr=5e-3)
+            weight_upt, weight_lowt, weight_leftt, weight_rightt, weight_rest], lr=5e-3)
         for n in range(N_iter_Adam):
             optimizer_lamda.zero_grad()
             loss2 = torch.mul(closure(t0data), -1).to(device)
@@ -458,6 +420,7 @@ if __name__ == '__main__':
             # weight_upt, weight_lowt, weight_leftt, weight_rightt, weight_rest], history_size=8, max_iter=500000)
         for n in range(N_iter_LBFGS):
             loss = closure(t0data) 
+            loss.backward()
             optimizer.step()
             # optimizer_lamda.step()
             loss_LBFGS.append(loss.cpu().detach().numpy())
@@ -522,12 +485,14 @@ if __name__ == '__main__':
         u_res, v_res, p_res, f_res, g_res = function(net, tbrest_in, x_rest_in, y_rest_in)            
         ut_res = u_res.reshape(nt, res_num)
         vt_res = v_res.reshape(nt, res_num)
+        pt_res = p_res.reshape(nt, res_num)
         ft_res = f_res.reshape(nt, res_num)
         gt_res = g_res.reshape(nt, res_num)
         # for i in range(nt):
         #     A = torch.from_numpy(amat[i].repeat(repeats=res_num)).to(device)
         t0data -= dt * B @ ft_res
         t0data -= dt * B @ gt_res
+        t0data -= dt * B @ pt_res
 
         ##### Save the model #####
         torch.save(net.state_dict(), 'model_RK_Re%d.pth'%Re)

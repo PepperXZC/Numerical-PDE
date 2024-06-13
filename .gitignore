@@ -2,3 +2,5 @@ data
 *.pt
 *.png
 pinns/outputs/
+nvidia_modulus/outputs
+paddle/output*
